@@ -6,11 +6,13 @@ from logging.handlers import RotatingFileHandler
 import requests
 from dotenv import load_dotenv
 
-# 💡 導入您的獨立功能模組與樣式模板
+# 💡 導入獨立功能模組與樣式模板
 from nas_manager import NASManager
 from nas_status import get_download_status
 import ui_template as ui
 from geo_tool import process_location_update
+import db_manager
+from weather_tool import get_final_report
 
 # ================= 📝 系統與日誌初始化 =================
 load_dotenv()
@@ -66,14 +68,18 @@ def send_msg(chat_id, text, keyboard=None):
 
 
 def start_listening():
-    """啟動監聽迴圈：修正選單按鈕比對與樣式調用"""
+    """
+    啟動監聽迴圈：嚴格執行選單調度原則，禁止在選單層級判斷訊息型態
+    """
     last_update_id = 0
-    global user_location_cache
+    # 啟動時初始化資料庫
+    db_manager.init_db()
 
-    logger.info("🔥 指揮中樞啟動 (自動座標偵測修正版)")
+    logger.info("🔥 指揮中樞啟動 (純選單調度轉接版)")
 
     while True:
         try:
+            # 獲取 Telegram 更新訊息
             url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
             params = {"offset": last_update_id + 1, "timeout": 30}
             resp = requests.get(url, params=params, timeout=40).json()
@@ -84,23 +90,26 @@ def start_listening():
                 chat_id = str(msg.get("chat", {}).get("id"))
                 text = msg.get("text", "")
 
+                # 安全檢查：僅限老闆本人存取
                 if chat_id != MY_CHAT_ID:
                     continue
 
-                # --- 1. 座標訊息攔截 (由 UI 傳送座標按鈕觸發) ---
-                if msg.get("location"):
-                    loc = msg["location"]
-                    success, result = process_location_update(loc["latitude"], loc["longitude"])
-
-                    if success:
-                        user_location_cache[chat_id] = result
-                        # 💡 修正：使用 ui.get_main_menu_keyboard() 確保按鈕不會消失
-                        send_msg(chat_id, ui.location_success_msg(result), ui.get_main_menu_keyboard())
-                    else:
-                        send_msg(chat_id, ui.error_msg(f"定位處理失敗: {result}"), ui.get_main_menu_keyboard())
+                # --- 1. 座標部轉接：禁止型態判斷，由部門內部處理 msg ---
+                if text == "📍 傳送座標"or msg.get("location"):
+                    import geo_tool
+                    # 💡 轉接任務：直接丟給部門，不准在 main 解析經緯度或 location 物件
+                    geo_tool.process(chat_id, msg)
                     continue
 
-                # --- 2. 處理等待輸入狀態 ---
+                # --- 2. 氣象部轉接 ---
+                elif text == "🌤️ 氣象局":
+                    import weather_tool
+                    # 💡 轉接任務：直接向氣象部要報告，不准在 main 讀取資料庫
+                    success, report = weather_tool.get_final_report(chat_id)
+                    send_msg(chat_id, report if success else ui.error_msg(report), ui.get_main_menu_keyboard())
+                    continue
+
+                # --- 3. 處理 NAS 下載任務輸入狀態 ---
                 if user_states.get(chat_id) == "WAIT_URL":
                     if text == "🏠 回主選單":
                         user_states.pop(chat_id)
@@ -112,7 +121,7 @@ def start_listening():
                         user_states.pop(chat_id)
                     continue
 
-                # --- 3. 選單按鈕邏輯比對 (需與 ui_template 內容完全一致) ---
+                # --- 4. 選單按鈕邏輯比對 ---
                 if text in ["/start", "🏠 回主選單"]:
                     send_msg(chat_id, ui.welcome_msg(), ui.get_main_menu_keyboard())
 
@@ -125,23 +134,7 @@ def start_listening():
 
                 elif text == "📊 查詢下載狀態":
                     success, data = get_download_status(nas_handler.ds)
-                    if success:
-                        msg_text = ui.status_report_msg(data['waiting'], data['active'])
-                    else:
-                        msg_text = ui.error_msg(data)
-                    send_msg(chat_id, msg_text, ui.NAS_MENU)
-
-                # 💡 修正：按鈕名稱需對應 ui_template 內的 "📍 傳送座標"
-                elif text == "📍 傳送座標":
-                    send_msg(chat_id, f"{ui.ICON_GEO} 正在等待您的位置訊息...", ui.get_main_menu_keyboard())
-
-                elif text == "🌤️ 氣象局":
-                    loc_name = user_location_cache.get(chat_id)
-                    if loc_name:
-                        send_msg(chat_id, f"🌤️ <b>即時氣象查詢</b>\n當前地區：<code>{loc_name}</code>\n(功能開發中...)",
-                                 ui.get_main_menu_keyboard())
-                    else:
-                        send_msg(chat_id, "💡 請先點擊「📍 傳送座標」以利精確定位。", ui.get_main_menu_keyboard())
+                    send_msg(chat_id, ui.status_report_msg(data['waiting'], data['active']) if success else ui.error_msg(data), ui.NAS_MENU)
 
         except Exception as e:
             logger.error(f"監聽異常: {e}")
@@ -150,4 +143,5 @@ def start_listening():
 
 
 if __name__ == "__main__":
+    db_manager.init_db()
     start_listening()

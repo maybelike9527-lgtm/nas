@@ -27,13 +27,13 @@ def welcome_msg(status="正常"):
     )
 
 
-def location_success_msg(name):
-    """座標辨識成功樣式"""
+def location_success_msg(city, town):
+    """座標辨識成功樣式 (支援分開顯示)"""
     return (
         f"{format_header('座標查詢結果')}"
         f"{ICON_GEO} 偵測到您的位置：\n"
-        f"<b>{name}</b>\n\n"
-        f"{ICON_INFO} 此位置已暫存，稍後可直接查詢氣象。"
+        f"<b>{city} {town}</b>\n\n"
+        f"{ICON_INFO} 此位置已分區存入資料庫，可精準查詢氣象。"
     )
 
 
@@ -74,6 +74,15 @@ def get_main_menu_keyboard():
         ],
         "resize_keyboard": True
     }
+
+def weather_report_msg(data):
+    """產出最終顯示在 Telegram 的 HTML 訊息"""
+    return (
+        f"🌤️ <b>{data['city']} {data['town']} 天氣預報</b>\n"
+        f"📝 狀況：<b>{data['state']}</b>\n"
+        f"🌡️ 溫度：<b>{data['temp']}°C</b>\n"
+        f"☔ 降雨：<b>{data['rain']}%</b>"
+    )
 
 def error_msg(reason):
     """標準錯誤回報樣式"""
