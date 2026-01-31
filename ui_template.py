@@ -7,10 +7,13 @@ ICON_SUCCESS = "✅"
 ICON_FAIL = "❌"
 ICON_INFO = "💡"
 ICON_GEO = "📍"
+ICON_STOCK = "📈"
 
 # --- 選單定義 (移至此處以修正 AttributeError) ---
-MAIN_MENU = [["📥 倉儲部 (NAS)"], ["🌤️ 氣象局", "📍 座標查詢"], ["📊 秘書室"]]
+MAIN_MENU = [["📥 倉儲部", "📊 財務部"], ["🌤️ 氣象局", "📍 座標查詢"], ["📊 秘書室"]]
 NAS_MENU = [["🚀 新增下載任務", "📊 查詢下載狀態"], ["🏠 回主選單"]]
+STOCK_MENU = [["🔍 查詢股價"],["➕ 建立庫存", "➖ 刪除庫存"],["🏠 回主選單"]
+]
 
 
 def format_header(title):
@@ -68,7 +71,7 @@ def get_main_menu_keyboard():
     """定義主選單鍵盤，包含自動請求座標按鈕"""
     return {
         "keyboard": [
-            [{"text": "📥 倉儲部 (NAS)"}],
+            [{"text": "📥 倉儲部"},{"text": "📊 財務部"}],
             [{"text": "🌤️ 氣象局"}, {"text": "📍 傳送座標", "request_location": True}], # 💡 直接分享座標
             [{"text": "📊 秘書室"}]
         ],

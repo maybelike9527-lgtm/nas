@@ -109,6 +109,11 @@ def start_listening():
                     send_msg(chat_id, report if success else ui.error_msg(report), ui.get_main_menu_keyboard())
                     continue
 
+                elif text in ["📊 財務部", "🔍 查詢股價", "➕ 建立庫存", "➖ 刪除庫存"]:
+                    import stock_tool
+                    stock_tool.process(chat_id, msg)
+                    continue
+
                 # --- 3. 處理 NAS 下載任務輸入狀態 ---
                 if user_states.get(chat_id) == "WAIT_URL":
                     if text == "🏠 回主選單":
